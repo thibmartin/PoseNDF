@@ -42,8 +42,8 @@ def axis_angle_to_quaternion_np(pose_in):
 
 class PoseData(Dataset):
 
-    def __init__(self,data_path, mode='query', batch_size=1, num_workers=12, num_samples=128, runs=1000):
-
+    def __init__(self,data_path, mode='query', batch_size=1, num_workers=8, num_samples=128, runs=500):
+        # Reduced number of workers (hardware limitations) and number of runs to have approximately the same number of positive and negative samples
         self.path = data_path
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -115,7 +115,7 @@ class AmassData(Dataset):
         self.num_workers = num_workers
         self.device=device
 
-        self.poses =np.load(self.path)['pose_body'].astype(np.float32)
+        self.poses =np.load(self.path)['pose_body'].astype(np.float32)[:, :63]#For some reason we have more dimensions, so we only keep the first 21 points (in 3D -> 63)
 
 
     def __len__(self):

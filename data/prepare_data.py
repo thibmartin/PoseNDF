@@ -37,7 +37,7 @@ def main(args):
             fp.write("cd /BS/garvita/work/code/PoseNDF "+ "\n")
             fp.write("case $SLURM_ARRAY_TASK_ID in" + "\n")
         count = 1
-        out_dir = '/BS/humanpose/static00/data/PoseNDF_train/smpl_h_final'
+        out_dir = '/BS/humanpose/static00/data/PoseNDF_train/smpl_h_final' #Change path
         for amass_data in amass_datas:
             ds_dir = os.path.join(args.raw_data,amass_data)
             seqs = sorted(os.listdir(ds_dir))
@@ -52,7 +52,7 @@ def main(args):
                     fp.write("\t {})".format(count) + "\n")
                     fp.write("\t\t\t")
                 fp.write(
-                    "python data/prepare_traindata2.py --seq_file {}/{} ".format(amass_data, seq))
+                    "python data/prepare_traindata.py --seq_file {}/{} ".format(amass_data, seq))
               
                 count += 1
                 if args.use_slurm:

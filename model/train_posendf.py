@@ -22,7 +22,7 @@ class PoseNDF_trainer(object):
             self.enc_name = opt['model']['StrEnc']['name']
         self.train_dataset = PoseData('train', data_path=opt['data']['data_dir'], amass_dir=opt['data']['amass_dir'],  batch_size=opt['train']['batch_size'], num_workers=opt['train']['num_worker'], flip=opt['data']['flip'])
         # self.val_dataset = PoseData('train', data_path=opt['data']['data_dir'],  batch_size=opt['train']['batch_size'], num_workers=opt['train']['num_worker'],flip=opt['data']['flip'])
-        self.train_dataset  = self.train_dataset.get_loader()
+        # self.train_dataset  = self.train_dataset.get_loader()
         # self.val_dataset  = self.val_dataset.get_loader()
         # create all the models and dataloader:
         self.learning_rate = opt['train']['optimizer_param']
@@ -38,6 +38,7 @@ class PoseNDF_trainer(object):
         self.val_min = 10000.
         if opt['train']['continue_train']:
             self.ep = self.load_checkpoint()
+        self.losses={} #stores all values for loss plot
         
         # if opt['train']['inference']:
         #     self.ep = self.load_checkpoint()
@@ -91,7 +92,7 @@ class PoseNDF_trainer(object):
         
         for i, inputs in enumerate(self.train_dataset):
             self.optimizer.zero_grad()
-            _, loss_dict = self.model(inputs['pose'], inputs['dist'], inputs['man_poses'], eikonal=self.loss_weight['eikonal'] )
+            _, loss_dict = self.model(torch.from_numpy(inputs['pose']), torch.from_numpy(inputs['dist']), torch.from_numpy(inputs['man_poses']), eikonal=self.loss_weight['eikonal'] )
             loss = 0.0
             for k in loss_dict.keys():
                 loss += self.loss_weight[k]*loss_dict[k]
@@ -104,9 +105,10 @@ class PoseNDF_trainer(object):
         for k in loss_dict.keys():
             self.writer.add_scalar("train/loss_{}".format(k), loss_dict[k].item(), self.iter_nums )
         self.writer.add_scalar("train/epoch", epoch_loss.avg, ep)
-        print( "train/epoch", epoch_loss.avg, ep)
+        print( "train/epoch", epoch_loss.avg.item(), ep)
+        self.losses[ep]=epoch_loss.avg.item() #Save all losses
 
-        self.save_checkpoint(ep)
+        self.save_checkpoint(ep, self.losses)
         return loss.item(),epoch_loss.avg
     
     # def inference(self, epoch, eval=True):
@@ -138,21 +140,21 @@ class PoseNDF_trainer(object):
 
     #     if val_loss < self.val_min:
     #         self.val_min = val_loss
-    #         self.save_checkpoint(epoch)
+    #         self.save_checkpoint(epoch, val_loss)
     #     print('validation vertices loss at {}....{:08f}'.format(epoch,val_loss))
     #     return val_loss
 
 
 
-    def save_checkpoint(self, epoch):
+    def save_checkpoint(self, epoch, loss):
         path = self.checkpoint_path + 'checkpoint_epoch_best.tar'
 
         if not os.path.exists(path):
-            torch.save({'epoch':epoch, 'model_state_dict': self.model.state_dict(),
+            torch.save({'epoch':epoch, 'model_state_dict': self.model.state_dict(), 'loss': loss,
                         'optimizer_state_dict': self.optimizer.state_dict()}, path,  _use_new_zipfile_serialization=False)
         else:
             shutil.copyfile(path, path.replace('best', 'previous'))
-            torch.save({'epoch':epoch, 'model_state_dict': self.model.state_dict(),
+            torch.save({'epoch':epoch, 'model_state_dict': self.model.state_dict(), 'loss': loss,
             'optimizer_state_dict': self.optimizer.state_dict()}, path,  _use_new_zipfile_serialization=False)
 
     def load_checkpoint(self):

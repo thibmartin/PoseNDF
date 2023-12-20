@@ -28,7 +28,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Train PoseNDF.'
     )
-    parser.add_argument('--config', '-c', default='configs/amass.yaml', type=str, help='Path to config file.')
+    parser.add_argument('--config', '-c', default='configs/posendf.yaml', type=str, help='Path to config file.')
     parser.add_argument('--test', '-t', action="store_true")
     args = parser.parse_args()
 

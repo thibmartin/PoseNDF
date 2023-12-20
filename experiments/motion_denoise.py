@@ -18,7 +18,7 @@ from pytorch3d.io import save_obj
 import os
 
 class MotionDenoise(object):
-    def __init__(self, posendf,  body_model, out_path='./experiment_results/motion_denoise', debug=False, device='cuda:0', batch_size=1, gender='male'):
+    def __init__(self, posendf,  body_model, out_path='./experiment_results/motion_denoise', debug=False, device='cpu', batch_size=1, gender='male'):
         self.debug = debug
         self.device = device
         self.pose_prior = posendf
@@ -123,26 +123,26 @@ class MotionDenoise(object):
 def main(opt, ckpt, motion_file,gt_data=None, out_path=None):
     ### load the model
     net = PoseNDF(opt)
-    device= 'cuda:0'
+    device= 'cpu'
     ckpt = torch.load(ckpt, map_location='cpu')['model_state_dict']
     net.load_state_dict(ckpt)
     net.eval()
     net = net.to(device)
 
 
-    motion_data = np.load(motion_file)['pose_body']
+    motion_data = np.load(motion_file)['pose_body'][10000:10500,:63]
     batch_size = len(motion_data)
     pose_body = torch.from_numpy(motion_data.astype(np.float32)).to(device=device)
     noisy_poses = torch.zeros((batch_size, 69)).to(device=device)
     noisy_poses[:, :63] = pose_body
 
     #  load body model
-    bm_dir_path = '/BS/garvita/work/SMPL_data/models/smpl'
+    bm_dir_path = 'C:/Users/thiba/Desktop/Semester_project/PoseNDF/SMPL_python_v.1.1.0/smpl'
     body_model = BodyModel(bm_path=bm_dir_path, model_type='smpl', batch_size=batch_size,  num_betas=10).to(device=device)
 
     if gt_data is not None:
 
-        motion_data_gt = np.load(motion_file)['pose_body']
+        motion_data_gt = np.load(motion_file)['pose_body'][10000:10500,:63]
         batch_size = len(motion_data_gt)
         pose_body = torch.from_numpy(motion_data_gt.astype(np.float32)).to(device=device)
         gt_poses = torch.zeros((batch_size, 69)).to(device=device)
@@ -159,33 +159,34 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Interpolate using PoseNDF.'
     )
-    parser.add_argument('--config', '-c', default='configs/amass_softplus.yaml', type=str, help='Path to config file.')
-    parser.add_argument('--ckpt_path', '-ckpt', default='/BS/humanpose/static00/pose_manifold/amass/latest_softplus_l1_1e-05_dist10.0_eik1.0/checkpoints/checkpoint_epoch_best.tar', type=str, help='Path to pretrained model.')
-    parser.add_argument('--motion_data', '-mf', default='/BS/humanpose/static00/data/PoseNDF_exp/motion_denoise_data/SSM_synced/20161014_50033/punch_kick_sync_poses.npz', type=str, help='Path to noisy motion file')
-    parser.add_argument('--outpath_folder', '-out', default='/BS/humanpose/static00/data/PoseNDF_exp/motion_denoise_results/', type=str, help='Path to output')
+    parser.add_argument('--config', '-c', default='configs/posendf.yaml', type=str, help='Path to config file.')
+    parser.add_argument('--ckpt_path', '-ckpt', default='C:/Users/thiba/Desktop/Semester_project/PoseNDF/results/trained_model/main_lrelu_l2_1e-05_dist1.0_eik1.0/checkpoints/checkpoint_epoch_best.tar', type=str, help='Path to pretrained model.')
+    parser.add_argument('--motion_data', '-mf', default='C:/Users/thiba/Desktop/Semester_project/PoseNDF/data/OH0037_body/pose3d_np_body.npz', type=str, help='Path to noisy motion file')
+    parser.add_argument('--outpath_folder', '-out', default='C:/Users/thiba/Desktop/Semester_project/PoseNDF/results/motion_denoise_results/', type=str, help='Path to output')
+    parser.add_argument('--gt_data', '-gt', default='C:/Users/thiba/Desktop/Semester_project/PoseNDF/data/OH0037_body/pose3d_np_body.npz', type=str, help='Path to ground truth motion file')
     args = parser.parse_args()
 
     opt = load_config(args.config)
 
     #running for tables:
-    datas = ['amass_noise_0.01_60', 'amass_noise_0.05_60', 'amass_noise_0.1_60', 'amass_noise_0.5_60', 'amass_noise_0.1_120', 'amass_noise_0.5_120' , 'amass_noise_0.1_240']
-    datas = ['amass_noise_0.5_60', 'amass_noise_0.01_60', 'amass_noise_0.05_60', 'amass_noise_0.1_60']
+    # datas = ['amass_noise_0.01_60', 'amass_noise_0.05_60', 'amass_noise_0.1_60', 'amass_noise_0.5_60', 'amass_noise_0.1_120', 'amass_noise_0.5_120' , 'amass_noise_0.1_240']
+    # datas = ['amass_noise_0.5_60', 'amass_noise_0.01_60', 'amass_noise_0.05_60', 'amass_noise_0.1_60']
     all_results = {}
-    for data in datas:
-        data_dir = '/BS/humanpose/static00/experiments/humor/results/out/{}/results_out'.format(data)
-        args.outpath_folder = '/BS/humanpose/static00/experiments/humor/results/posendf/{}'.format(data)
-        os.makedirs(args.outpath_folder ,exist_ok=True)
-        seqs = sorted(os.listdir(data_dir))
-        all_error = []
-        for seq in seqs:
-            out_path = os.path.join(args.outpath_folder, seq)
-            os.makedirs(out_path,exist_ok=True)
-            obs_path =  os.path.join(data_dir, seq, 'observations.npz')
-            if os.path.exists(obs_path):
-                v2v_err = main(opt, args.ckpt_path,obs_path, gt_data= os.path.join(data_dir, seq, 'gt_results.npz'),out_path=out_path)
-                all_error.append(v2v_err)
-        print(data, len(seqs), np.mean(np.array(all_error)))
-        all_results[data] =  np.array(all_error)
-        ipdb.set_trace()
+    # for data in datas:
+        # data_dir = '/BS/humanpose/static00/experiments/humor/results/out/{}/results_out'.format(data)
+        # args.outpath_folder = '/BS/humanpose/static00/experiments/humor/results/posendf/{}'.format(data)
+    os.makedirs(args.outpath_folder ,exist_ok=True)
+    # seqs = sorted(os.listdir(data_dir))
+    all_error = []
+        # for seq in seqs:
+            # out_path = os.path.join(args.outpath_folder, seq)
+    os.makedirs(args.outpath_folder,exist_ok=True)
+            # obs_path =  os.path.join(data_dir, seq, 'observations.npz')
+    if os.path.exists(args.ckpt_path):
+        v2v_err = main(opt, args.ckpt_path,args.motion_data, gt_data= args.gt_data,out_path=args.outpath_folder)
+        all_error.append(v2v_err)
+    all_results=  np.array(all_error)
+    #ipdb.set_trace()
     print(all_results)
-    np.savez('/BS/humanpose/static00/experiments/humor/results/posendf_table_2.npz', **all_results)
+    out_path = os.path.join(args.outpath_folder, "motion_denoise_results.npz")
+    np.savez(out_path, results=all_results)
